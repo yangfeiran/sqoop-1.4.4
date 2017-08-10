@@ -1,0 +1,368 @@
+
+////
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+////
+
+
+Notes for specific connectors
+-----------------------------
+
+MySQL JDBC Connector
+~~~~~~~~~~~~~~~~~~~~
+
+This section contains information specific to MySQL JDBC Connector.
+
+Upsert functionality
+^^^^^^^^^^^^^^^^^^^^
+
+MySQL JDBC Connector is supporting upsert functionality using argument
++\--update-mode allowinsert+. To achieve that Sqoop is using MySQL clause INSERT INTO
+... ON DUPLICATE KEY UPDATE. This clause do not allow user to specify which columns
+should be used to distinct whether we should update existing row or add new row. Instead
+this clause relies on table's unique keys (primary key belongs to this set). MySQL
+will try to insert new row and if the insertion fails with duplicate unique key error
+it will update appropriate row instead. As a result, Sqoop is ignoring values specified
+in parameter +\--update-key+, however user needs to specify at least one valid column
+to turn on update mode itself.
+
+Microsoft SQL Connector
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Extra arguments
+^^^^^^^^^^^^^^^
+
+List of all extra arguments supported by Microsoft SQL Connector is shown below:
+
+.Supported Microsoft SQL Connector extra arguments:
+[grid="all"]
+`----------------------------------------`---------------------------------------
+Argument                                 Description
+---------------------------------------------------------------------------------
++\--schema <name>+                       Scheme name that sqoop should use. \
+                                         Default is "dbo".
++\--table-hints <hints>+                 Table hints that Sqoop should use for \
+                                         data movement.
+---------------------------------------------------------------------------------
+
+Schema support
+^^^^^^^^^^^^^^
+If you need to work with tables that are located in non-default schemas, you can
+specify schema names via the +\--schema+ argument. Custom schemas are supported for
+both import and export jobs. For example:
+
+----
+$ sqoop import ... --table custom_table -- --schema custom_schema
+----
+
+Table hints
+^^^^^^^^^^^
+
+Sqoop supports table hints in both import and export jobs. Table hints are used only
+for queries that move data from/to Microsoft SQL Server, but they cannot be used for
+meta data queries. You can specify a comma-separated list of table hints in the
++\--table-hints+ argument. For example:
+
+----
+$ sqoop import ... --table custom_table -- --table-hints NOLOCK
+----
+
+
+PostgreSQL Connector
+~~~~~~~~~~~~~~~~~~~~~
+
+Extra arguments
+^^^^^^^^^^^^^^^
+
+List of all extra arguments supported by PostgreSQL Connector is shown below:
+
+.Supported PostgreSQL extra arguments:
+[grid="all"]
+`----------------------------------------`---------------------------------------
+Argument                                 Description
+---------------------------------------------------------------------------------
++\--schema <name>+                       Scheme name that sqoop should use. \
+                                         Default is "public".
+---------------------------------------------------------------------------------
+
+The direct connector (used when specified +\--direct+ parameter), offers also
+additional extra arguments:
+
+.Additional supported PostgreSQL extra arguments in direct mode:
+[grid="all"]
+`----------------------------------------`---------------------------------------
+Argument                                 Description
+---------------------------------------------------------------------------------
++\--boolean-true-string <str>+           String that will be used to encode \
+                                         +true+ value of +boolean+ columns.
+                                         Default is "TRUE".
++\--boolean-false-string <str>+          String that will be used to encode \
+                                         +false+ value of +boolean+ columns.
+                                         Default is "FALSE".
+---------------------------------------------------------------------------------
+
+Schema support
+^^^^^^^^^^^^^^
+
+If you need to work with table that is located in schema other than default one,
+you need to specify extra argument +\--schema+. Custom schemas are supported for
+both import and export job (optional staging table however must be present in the
+same schema as target table). Example invocation:
+
+----
+$ sqoop import ... --table custom_table -- --schema custom_schema
+----
+
+
+
+pg_bulkload connector
+~~~~~~~~~~~~~~~~~~~~~
+
+Purpose
+^^^^^^^
+pg_bulkload connector is a direct connector for exporting data into PostgreSQL.
+This connector uses
+http://pgbulkload.projects.postgresql.org/index.html[pg_bulkload].
+Users benefit from functionality of pg_bulkload such as
+fast exports bypassing shared bufferes and WAL,
+flexible error records handling,
+and ETL feature with filter functions.
+
+Requirements
+^^^^^^^^^^^^
+pg_bulkload connector requires following conditions for export job execution:
+
+* The link:http://pgbulkload.projects.postgresql.org/index.html[pg_bulkload]
+  must be installed on DB server and all slave nodes.
+  RPM for RedHat or CentOS is available in then
+  link:http://pgfoundry.org/frs/?group_id=1000261[download page].
+* The link:http://jdbc.postgresql.org/index.html[PostgreSQL JDBC]
+  is required on client node.
+* Superuser role of PostgreSQL database is required for execution of pg_bulkload.
+
+Syntax
+^^^^^^
+Use +--connection-manager+ option to specify connection manager classname.
+----
+$ sqoop export (generic-args) --connection-manager org.apache.sqoop.manager.PGBulkloadManager (export-args)
+$ sqoop-export (generic-args) --connection-manager org.apache.sqoop.manager.PGBulkloadManager (export-args)
+----
+
+This connector supports export arguments shown below.
+
+.Supported export control arguments:
+[grid="all"]
+`----------------------------------------`---------------------------------------
+Argument                                 Description
+---------------------------------------------------------------------------------
++\--export-dir <dir>+                    HDFS source path for the export
++-m,\--num-mappers <n>+                  Use 'n' map tasks to export in\
+                                         parallel
++\--table <table-name>+                  Table to populate
++\--input-null-string <null-string>+     The string to be interpreted as\
+                                         null for string columns
++\--clear-staging-table+                 Indicates that any data present in\
+                                         the staging table can be deleted.
+---------------------------------------------------------------------------------
+
+There are additional configuration for pg_bulkload execution
+specified via Hadoop Configuration properties
+which can be given with +-D <property=value>+ option.
+Because Hadoop Configuration properties are generic arguments of the sqoop,
+it must preceed any export control arguments.
+
+.Supported export control properties:
+[grid="all"]
+`-----------------------------`----------------------------------------------
+Property                      Description
+-----------------------------------------------------------------------------
+mapred.reduce.tasks           Number of reduce tasks for staging. \
+                              The defalt value is 1. \
+                              Each tasks do staging in a single transaction.
+pgbulkload.bin                Path of the pg_bulkoad binary \
+                              installed on each slave nodes.
+pgbulkload.check.constraints  Specify whether CHECK constraints are checked \
+                              during the loading. \
+                              The default value is YES.
+pgbulkload.parse.errors       The maximum mumber of ingored records \
+                              that cause errors during parsing, \
+                              encoding, filtering, constraints checking, \
+                              and data type conversion. \
+                              Error records are recorded \
+                              in the PARSE BADFILE.  \
+                              The default value is INFINITE.
+pgbulkload.duplicate.errors   Number of ingored records \
+                              that violate unique constraints. \
+                              Duplicated records are recorded in the \
+                              DUPLICATE BADFILE on DB server. \
+                              The default value is INFINITE.
+pgbulkload.filter             Specify the filter function \
+                              to convert each row in the input file.  \
+                              See the pg_bulkload documentation to know \
+                              how to write FILTER functions.
+-----------------------------------------------------------------------------
+
+Here is a example of complete command line.
+----
+$ sqoop export \
+    -Dmapred.reduce.tasks=2
+    -Dpgbulkload.bin="/usr/local/bin/pg_bulkload" \
+    -Dpgbulkload.input.field.delim=$'\t' \
+    -Dpgbulkload.check.constraints="YES" \
+    -Dpgbulkload.parse.errors="INFINITE" \
+    -Dpgbulkload.duplicate.errors="INFINITE" \
+    --connect jdbc:postgresql://pgsql.example.net:5432/sqooptest \
+    --connection-manager org.apache.sqoop.manager.PGBulkloadManager \
+    --table test --username sqooptest --export-dir=/test -m 2
+----
+
+Data Staging
+^^^^^^^^^^^^
+Each map tasks of pg_bulkload connector's export job create
+their own staging table on the fly.
+The Name of staging tables is decided based on the destination table
+and the task attempt ids.
+For example, the name of staging table for the "test" table is like
++test_attempt_1345021837431_0001_m_000000_0+ .
+
+Staging tables are automatically dropped if tasks successfully complete
+or map tasks fail.
+When reduce task fails,
+staging table for the task are left for manual retry and
+users must take care of it.
+
+Netezza Connector
+~~~~~~~~~~~~~~~~~
+
+Extra arguments
+^^^^^^^^^^^^^^^
+
+List of all extra arguments supported by Netezza Connector is shown below:
+
+.Supported Netezza extra arguments:
+[grid="all"]
+`-------------------------------------`----------------------------------------
+Argument                              Description
+-------------------------------------------------------------------------------
++--partitioned-access+                Whether each mapper acts on a subset\
+                                      of data slices of a table or all\
+                                      Default is "false" for standard mode\
+                                      and "true" for direct mode.
++--max-errors+                        Applicable only in direct mode.\
+                                      This option specifies the error threshold\
+                                      per mapper while transferring data. If\
+                                      the number of errors encountered exceed\
+                                      this threshold then the job will fail.
+                                      Default value is 1.
++--log-dir+                           Applicable only in direct mode.\
+                                      Specifies the directory where Netezza\
+                                      external table operation logs are stored.\
+                                      Default value is /tmp.
+--------------------------------------------------------------------------------
+
+
+Direct Mode
+^^^^^^^^^^^
+Netezza connector supports an optimized data transfer facility using the
+Netezza external tables feature.  Each map tasks of Netezza connector's import
+job will work on a subset of the Netezza partitions and transparently create
+and use an external table to transport data.  Similarly, export jobs will use
+the external table to push data fast onto the NZ system.   Direct mode does
+not support staging tables, upsert options etc.
+
+Here is an example of complete command line for import using the Netezza
+external table feature.
+
+----
+$ sqoop import \
+    --direct \
+    --connect jdbc:netezza://nzhost:5480/sqoop \
+    --table nztable \
+    --username nzuser \
+    --password nzpass \
+    --target-dir hdfsdir
+
+----
+
+Here is an example of complete command line for export with tab as the field
+terminator character.
+
+----
+$ sqoop export \
+    --direct \
+    --connect jdbc:netezza://nzhost:5480/sqoop \
+    --table nztable \
+    --username nzuser \
+    --password nzpass \
+    --export-dir hdfsdir \
+    --input-fields-terminated-by "\t"
+----
+
+Null string handling
+^^^^^^^^^^^^^^^^^^^^
+
+Netezza direct connector supports the null-string features of Sqoop.  The null
+string values are converted to appropriate external table options during export
+and import operations.
+
+.Supported export control arguments:
+[grid="all"]
+`----------------------------------------`---------------------------------------
+Argument                                 Description
+---------------------------------------------------------------------------------
++\--input-null-string <null-string>+     The string to be interpreted as\
+                                         null for string columns.
++\--input-null-non-string <null-string>+ The string to be interpreted as\
+                                         null for non string columns.
+---------------------------------------------------------------------------------
+
+In the case of Netezza direct mode connector, both the arguments must be
+left to the default values or explicitly set to the same value.  Furthermore
+the null string value is restricted to 0-4 utf8 characters.
+
+On export, for non-string columns, if the chosen null value is a valid
+representation in the column domain, then the column might not be loaded as
+null.  For example, if the null string value is specified as "1", then on
+export, any occurrence of "1" in the input file will be loaded as value 1
+instead of NULL for int columns.
+
+It is suggested that the null value be specified as empty string for
+performance and consistency.
+
+.Supported import control arguments:
+[grid="all"]
+`----------------------------------------`---------------------------------------
+Argument                                 Description
+---------------------------------------------------------------------------------
++\--null-string <null-string>+           The string to be interpreted as\
+                                         null for string columns.
++\--null-non-string <null-string>+       The string to be interpreted as\
+                                         null for non string columns.
+---------------------------------------------------------------------------------
+
+In the case of Netezza direct mode connector, both the arguments must be
+left to the default values or explicitly set to the same value.  Furthermore
+the null string value is restricted to 0-4 utf8 characters.
+
+On import, for non-string columns, the chosen null value in current
+implementations the null value representation is ignored for non character
+columns.  For example, if the null string value is specified as "\N", then on
+import, any occurrence of NULL for non-char columns in the table will be
+imported as an empty string instead of '\N', the chosen null string
+representation.
+
+It is suggested that the null value be specified as empty string for
+performance and consistency.
